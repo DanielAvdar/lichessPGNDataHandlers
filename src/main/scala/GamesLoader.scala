@@ -12,6 +12,7 @@ object GamesLoader {
 
   def main(args: Array[String]): Unit = {
     val gameRows=PGNExtractTransform.pgnETLtoRowRDD()
+    gameRows.foreach(println)
 
 
 
