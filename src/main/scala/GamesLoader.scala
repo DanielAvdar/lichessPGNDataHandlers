@@ -11,7 +11,9 @@ object GamesLoader {
 
 
   def main(args: Array[String]): Unit = {
-    val gameRows=PGNExtractTransform.pgnETLtoRowRDD()
+    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
+    val sc = new SparkContext(conf)
+    val gameRows=PGNExtractTransform.pgnETLtoRowRDD(sc)
     gameRows.foreach(println)
 
 
