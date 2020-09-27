@@ -135,17 +135,19 @@ object PGNExtractTransform {
 
 
   def main(args: Array[String]): Unit ={
-    val games = pgnETLtoRowRDD()
+    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
+    val sc = new SparkContext(conf)
+    val games = pgnETLtoRowRDD(sc)
     games.foreach(println)
 
 
   }
 
-  def pgnETLtoRowRDD(): RDD[Row] = {
+  def pgnETLtoRowRDD(sc: SparkContext): RDD[Row] = {
 
 
-    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-    val sc = new SparkContext(conf)
+//    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
+//    val sc = new SparkContext(conf)
     val pgn_file = sc.textFile(PGN_FILE).filter(filterNull)
 
     val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
