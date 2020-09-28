@@ -3,9 +3,9 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 
 object PGNExtractTransform {
-  val DIRECTORY = "C:\\tmp_test\\"//todo
-  val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2"//todo
-
+  val DIRECTORY = "C:\\tmp_test\\"
+  //todo replace
+  val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2" //todo replace
 
 
   def filterNull: String => Boolean = (x: String) => x != ""
@@ -63,13 +63,11 @@ object PGNExtractTransform {
   }
 
 
-
   def mapNames: String => String = (x: String) => x.substring(8).dropRight(2)
 
   def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
 
   def mapEventsFarther(x: String): String = {
-    //    println(res._1)
     if (x.startsWith("Bullet"))
       "Bullet"
     else if (x.startsWith("Blitz"))
@@ -104,7 +102,6 @@ object PGNExtractTransform {
   def mapTermination: String => String = (x: String) => x.substring(14).dropRight(2)
 
 
-
   def swapValKey[T1, T2](res: (T1, T2)): (T2, T1) = {
 
     (res._2, res._1)
@@ -133,20 +130,20 @@ object PGNExtractTransform {
   }
 
 
-
-  def main(args: Array[String]): Unit ={
-    val games = pgnETLtoRowRDD()
+  def main(args: Array[String]): Unit = {
+    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
+    val sc = new SparkContext(conf)
+    val games = pgnETLtoRowRDD(sc)
     games.foreach(println)
 
 
   }
 
-  def pgnETLtoRowRDD(): RDD[Row] = {
+  def pgnETLtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
 
 
-    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-    val sc = new SparkContext(conf)
-    val pgn_file = sc.textFile(PGN_FILE).filter(filterNull)
+    val pgn_file = sc.textFile(pgnPath).filter(filterNull)
+      .persist(storage.StorageLevel.MEMORY_ONLY_SER)
 
     val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
       .map(transformMapFun(mapEventsFarther))
@@ -211,7 +208,7 @@ object PGNExtractTransform {
   def row(f: (Long, ((((((((((((String, String), String), String), String), String), String), String), String), String), String), String), String))): Row = {
     val (gameId, ((((((((((((event, wPlayerName), bPlayerName), winner), date), time), wRating), bRating), eco), opening), timeCtrl), termination), gamePlay)) = f
 
-    val gameRow = sql.Row(gameId, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco, opening, timeCtrl, date, time, termination, gamePlay)
+    val gameRow = sql.Row(gameId.toString, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco, opening, timeCtrl, date, time, termination, gamePlay)
     gameRow
   }
 
