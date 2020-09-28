@@ -4,8 +4,8 @@ import org.apache.spark.sql.Row
 
 object PGNExtractTransform {
   val DIRECTORY = "C:\\tmp_test\\"
-  //todo
-  val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2" //todo
+  //todo replace
+  val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2" //todo replace
 
 
   def filterNull: String => Boolean = (x: String) => x != ""
@@ -68,7 +68,6 @@ object PGNExtractTransform {
   def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
 
   def mapEventsFarther(x: String): String = {
-    //    println(res._1)
     if (x.startsWith("Bullet"))
       "Bullet"
     else if (x.startsWith("Blitz"))
@@ -143,10 +142,8 @@ object PGNExtractTransform {
   def pgnETLtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
 
 
-    //    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-    //    val sc = new SparkContext(conf)
-    val pgn_file = sc.textFile(pgnPath,400).filter(filterNull)
-      .persist(storage.StorageLevel.MEMORY_AND_DISK)
+    val pgn_file = sc.textFile(pgnPath).filter(filterNull)
+      .persist(storage.StorageLevel.MEMORY_ONLY_SER)
 
     val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
       .map(transformMapFun(mapEventsFarther))
