@@ -39,11 +39,7 @@ object GamesLoader {
 
 
   }
-  def tmppp(row: Row):Unit={
 
-    for(i <-row.toSeq)
-    {println(i)}
 
-  }
 
 }
