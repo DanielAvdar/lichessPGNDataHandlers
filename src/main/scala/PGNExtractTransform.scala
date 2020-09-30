@@ -133,13 +133,15 @@ object PGNExtractTransform {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
     val sc = new SparkContext(conf)
-    val games = pgnETLtoRowRDD(sc)
+    val games = pgnETtoRowRDD(sc)
     games.foreach(println)
 
 
   }
 
-  def pgnETLtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
+  def pgnETtoTuple(sc: SparkContext, pgnPath: String = PGN_FILE):
+  RDD[(String, String, String, String, String, String, String,
+    String, String, String, String, String, String)] = {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
@@ -151,38 +153,39 @@ object PGNExtractTransform {
 
     val wPlayers = pgn_file.filter(filter_wight).zipWithIndex().map(transformMapFun(mapNames))
     val bPlayers = pgn_file.filter(filter_black).zipWithIndex().map(transformMapFun(mapNames))
-    //    println("Players: ", wPlayers.count(), bPlayers.count())
-
+//        println("Players: ", wPlayers.count(), bPlayers.count())
+//    println(wPlayers.map((f: (String, Long)) => f._1).distinct().count())
+//    println(bPlayers.map((f: (String, Long)) => f._1).distinct().count())
     val result = pgn_file.filter(filterResult).zipWithIndex().map(transformMapFun(mapResult)).map(mapResult2)
-    //    println("result:", result.count())
+//        println("result:", result.count())
 
 
     val date = pgn_file.filter(filterDate).zipWithIndex().map(transformMapFun(mapDate))
-    //    println("date:", date.count())
+//        println("date:", date.count())
 
     val time = pgn_file.filter(filterTime).zipWithIndex().map(transformMapFun(mapTime))
-    //    println("time:", time.count())
+//        println("time:", time.count())
 
     val wRating = pgn_file.filter(filterWRating).zipWithIndex().map(transformMapFun(mapWRating))
     val bRating = pgn_file.filter(filterBRating).zipWithIndex().map(transformMapFun(mapBRating))
-    //    println("Rating: ", wRating.count(), bRating.count())
+//        println("Rating: ", wRating.count(), bRating.count())
 
 
     val eco = pgn_file.filter(filterECO).zipWithIndex().map(transformMapFun(mapECO))
-    //    println("eco:", eco.count())
+//        println("eco:", eco.count())
 
 
     val Opening = pgn_file.filter(filterOpening).zipWithIndex().map(transformMapFun(mapOpening))
-    //    println("Opening:", Opening.count())
+//        println("Opening:", Opening.count())
 
     val timeControl = pgn_file.filter(filterTimeControl).zipWithIndex().map(transformMapFun(mapTimeControl))
-    //    println("timeControl:", timeControl.count())
+//        println("timeControl:", timeControl.count())
 
     val Termination = pgn_file.filter(filterTermination).zipWithIndex().map(transformMapFun(mapTermination))
+//    println("Termination:", Termination.count())
 
-
-    val plays = pgn_file.filter(filterPlays).zipWithIndex()
-    //    println("Termination:", Termination.count())
+//    val plays = pgn_file.filter(filterPlays).zipWithIndex()
+//        println("plays:", plays.count())
 
 
     val gamesRDD = events.map(swapValKey)
@@ -197,19 +200,37 @@ object PGNExtractTransform {
       .join(Opening.map(swapValKey))
       .join(timeControl.map(swapValKey))
       .join(Termination.map(swapValKey))
-      .join(plays.map(swapValKey))
+//      .join(plays.map(swapValKey))
 
+//    println(":",gamesRDD.map(s => s._2._1._1._1._1._1._1._1._1._1._1._1._1).distinct().count())
+    gamesRDD.map(toFlatTuple)
+
+
+  }
+
+  def pgnETtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
+
+
+    val gamesRDD = pgnETtoTuple(sc, pgnPath)
 
     gamesRDD.map(row)
 
 
   }
 
-  def row(f: (Long, ((((((((((((String, String), String), String), String), String), String), String), String), String), String), String), String))): Row = {
-    val (gameId, ((((((((((((event, wPlayerName), bPlayerName), winner), date), time), wRating), bRating), eco), opening), timeCtrl), termination), gamePlay)) = f
 
-    val gameRow = sql.Row(gameId.toString, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco, opening, timeCtrl, date, time, termination, gamePlay)
+  def row(f: (String, String, String, String, String, String,
+    String, String, String, String, String, String, String)): Row = {
+
+    val gameRow = sql.Row(f)
     gameRow
+  }
+
+  def toFlatTuple(f: (Long, (((((((((((String, String), String), String), String), String), String), String), String), String), String), String))) = {
+    val (gameId, (((((((((((event, wPlayerName), bPlayerName), winner), date), time), wRating), bRating), eco), opening), timeCtrl), termination)) = f
+
+    (gameId.toString, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco, opening, timeCtrl, date, time, termination)
+
   }
 
 
