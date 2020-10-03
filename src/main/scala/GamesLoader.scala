@@ -1,15 +1,12 @@
 
 import java.util.UUID
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark._
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.Row
 import org.apache.spark.graphx._
-import com.fasterxml.jackson.annotation.ObjectIdGenerators.UUIDGenerator
-import org.neo4j.spark.Neo4j
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types._
 import org.neo4j.spark.cypher.{NameProp, Pattern}
+import org.neo4j.spark.utils.Neo4jUtils
 
 object GamesLoader {
   val DIRECTORY = "C:\\tmp_test\\"
@@ -107,25 +104,35 @@ object GamesLoader {
   def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = PGN_FILE): Unit = {
     val games = PGNExtractTransform.pgnETtoTuple(sc, pgnPath)
 
-    val plr = println(games.map(s => s._3).distinct.count())
+    //    val plr = println(games.map(s => s._3).distinct.count())
 
     val edges = games.map(mapToEdge)
     val vertexes = games.map(mapRowToVertex)
 
     val graph = Graph(vertexes, edges)
-//    val verGraph = Graph(vertexes, edges)
+    //    val verGraph = Graph(vertexes, edges)
 
+//    graph.triangleCount().vertices.map(f=>f._2).foreach(println)
 
-//    println(graph.vertices.count())
-    val neo = Neo4j(sc)
+    //    println("connectedComponents: ",graph.connectedComponents().vertices.compute(1).count())
+//    println("pageRank: ", graph.pageRank(0.0001).vertices.map(f=>f._2).foreach(println))
+    graph.pageRank(0.0001).vertices.map(f=>f._2).foreach(println)
+
+    //    println(graph.vertices.count())
+    val neo = Neo4jUtils.executeTxWithRetries()
+//    neo.
     //    println(graph.vertices.distinct().count())
 
-//    val p = Pattern(NameProp("Player", "identity"), Array(NameProp("event", "text")), NameProp("Player", "identity"))
-    val p = Pattern(NameProp("Player",), Array(NameProp("event", "text")), NameProp("Player"))
-   Some( p.target.asTuple).isDefined
+    val p = Pattern(NameProp("Player", "identity"), Array(NameProp("event", "text")), NameProp("Player", "identity"))
+    //    val p = Pattern(NameProp("Player",), Array(NameProp("event", "text")), NameProp("Player"))
+    Some(p.target.asTuple).isDefined
 
-    neo.saveGraph(graph, "name",
-      p, merge = true)
+
+
+//        neo.saveGraph(sc,graph, "name",relTypeProp=("event", "text"),
+//          mainLabelIdProp=Some( p.target.asTuple),
+//          secondLabelIdProp = Some( p.target.asTuple),
+//           merge = true)
 
 
     //    println(graph.numEdges)
@@ -137,34 +144,30 @@ object GamesLoader {
   }
 
 
-  def tester(sc: SparkContext) = {
-    import org.neo4j.spark._
-
-    val g = Neo4jGraph.loadGraph(sc, "Person", Seq("KNOWS"), "Person")
-    // g: org.apache.spark.graphx.Graph[Any,Int] = org.apache.spark.graphx.impl.GraphImpl@574985d8
-
-    g.vertices.count
-    // res0: Long = 999937
-
-    g.edges.count
-    // res1: Long = 999906
-
-    import org.apache.spark.graphx._
-    import org.apache.spark.graphx.lib._
-
-    val g2 = PageRank.run(g, 5)
-
-    val v = g2.vertices.take(5)
-    // v: Array[(org.apache.spark.graphx.VertexId, Double)] = Array((185012,0.15), (612052,1.0153273593749998), (354796,0.15), (182316,0.15), (199516,0.38587499999999997))
-    g2.triplets.foreach(println)
-    g2.edges.foreach(println)
-    g2.vertices.foreach(println)
-    Neo4jGraph.saveGraph(sc, g2, "rank")
-    // res2: (Long, Long) = (999937,0)
-
-    // full syntax example
-    Neo4jGraph.saveGraph(sc, g, "rank", ("LIKES", "score"), Some(("Person", "name")), Some(("Movie", "title")), merge = true)
-  }
+  //  def tester(sc: SparkContext) = {
+  //
+  //    val g = Neo4jGraph.loadGraph(sc, "Person", Seq("KNOWS"), "Person")
+  //    // g: org.apache.spark.graphx.Graph[Any,Int] = org.apache.spark.graphx.impl.GraphImpl@574985d8
+  //
+  //    g.vertices.count
+  //    // res0: Long = 999937
+  //
+  //    g.edges.count
+  //    // res1: Long = 999906
+  //
+  //    val g2 = PageRank.run(g, 5)
+  //
+  //    val v = g2.vertices.take(5)
+  //    // v: Array[(org.apache.spark.graphx.VertexId, Double)] = Array((185012,0.15), (612052,1.0153273593749998), (354796,0.15), (182316,0.15), (199516,0.38587499999999997))
+  //    g2.triplets.foreach(println)
+  //    g2.edges.foreach(println)
+  //    g2.vertices.foreach(println)
+  //    Neo4jGraph.saveGraph(sc, g2, "rank")
+  //    // res2: (Long, Long) = (999937,0)
+  //
+  //    // full syntax example
+  //    Neo4jGraph.saveGraph(sc, g, "rank", ("LIKES", "score"), Some(("Person", "name")), Some(("Movie", "title")), merge = true)
+  //  }
 
 
   def rowRDDtoCSV(sc: SparkContext, pgnPath: String = PGN_FILE): Unit = {
