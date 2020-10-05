@@ -1,3 +1,4 @@
+import Property.{BLACK, GameJoinFormat, GameTupleFormat}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
@@ -8,41 +9,38 @@ object PGNExtractTransform {
   val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2" //todo replace
 
 
-  def filterNull: String => Boolean = (x: String) => x != ""
+  private def filterNull: String => Boolean = (x: String) => x != ""
 
-  def filterEvent: String => Boolean = (x: String) => x.startsWith("[Event ")
+  private def filterEvent: String => Boolean = (x: String) => x.startsWith("[Event ")
 
-  def filter_wight: String => Boolean = (x: String) => x.startsWith("[White ")
+  private def filter_wight: String => Boolean = (x: String) => x.startsWith("[White ")
 
-  def filter_black: String => Boolean = (x: String) => x.startsWith("[Black ")
+  private def filter_black: String => Boolean = (x: String) => x.startsWith("[Black ")
 
-  def filterResult: String => Boolean = (x: String) => x.startsWith("[Result ")
+  private def filterResult: String => Boolean = (x: String) => x.startsWith("[Result ")
 
-  def filterDate: String => Boolean = (x: String) => x.startsWith("[UTCDate ")
+  private def filterDate: String => Boolean = (x: String) => x.startsWith("[UTCDate ")
 
-  def filterTime: String => Boolean = (x: String) => x.startsWith("[UTCTime ")
-
-
-  def filterWRating: String => Boolean = (x: String) => x.startsWith("[WhiteElo ")
-
-  def filterBRating: String => Boolean = (x: String) => x.startsWith("[BlackElo ")
-
-  def filterWRatingLos: String => Boolean = (x: String) => x.startsWith("[WhiteRatingDiff ")
-
-  def filterBRatingLos: String => Boolean = (x: String) => x.startsWith("[BlackRatingDiff ")
-
-  def filterECO: String => Boolean = (x: String) => x.startsWith("[ECO ")
-
-  def filterOpening: String => Boolean = (x: String) => x.startsWith("[Opening ")
-
-  def filterTimeControl: String => Boolean = (x: String) => x.startsWith("[TimeControl ")
-
-  def filterTermination: String => Boolean = (x: String) => x.startsWith("[Termination ")
-
-  def filterPlays: String => Boolean = (x: String) => x.startsWith("1. ")
+  private def filterTime: String => Boolean = (x: String) => x.startsWith("[UTCTime ")
 
 
-  def transformMapFun[T1, T2](mapper: (T1) => (T2)): ((T1, Long)) => ((T2, Long)) = {
+  private def filterWRating: String => Boolean = (x: String) => x.startsWith("[WhiteElo ")
+
+  private def filterBRating: String => Boolean = (x: String) => x.startsWith("[BlackElo ")
+
+
+
+  private def filterECO: String => Boolean = (x: String) => x.startsWith("[ECO ")
+
+  private def filterOpening: String => Boolean = (x: String) => x.startsWith("[Opening ")
+
+  private def filterTimeControl: String => Boolean = (x: String) => x.startsWith("[TimeControl ")
+
+  private def filterTermination: String => Boolean = (x: String) => x.startsWith("[Termination ")
+
+
+
+  private def transformMapFun[T1, T2](mapper: (T1) => (T2)): ((T1, Long)) => ((T2, Long)) = {
 
 
     def transformFun = (s: (T1, Long)) => (mapper(s._1), s._2)
@@ -52,22 +50,13 @@ object PGNExtractTransform {
 
   }
 
-  def transformFilterFun(filterFun: (String) => (Boolean)): ((Long, String)) => (Boolean) = {
 
 
-    val transformFun = (s: (Long, String)) => filterFun(s._2)
+  private def mapNames: String => String = (x: String) => x.substring(8).dropRight(2)
 
+  private def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
 
-    transformFun
-
-  }
-
-
-  def mapNames: String => String = (x: String) => x.substring(8).dropRight(2)
-
-  def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
-
-  def mapEventsFarther(x: String): String = {
+  private def mapEventsFarther(x: String): String = {
     if (x.startsWith("Bullet"))
       "Bullet"
     else if (x.startsWith("Blitz"))
@@ -79,40 +68,34 @@ object PGNExtractTransform {
   }
 
 
-  def mapResult: String => String = (x: String) => x.substring(9).dropRight(2)
+  private def mapResult: String => String = (x: String) => x.substring(9).dropRight(2)
 
-  def mapDate: String => String = (x: String) => x.substring(10).dropRight(2)
+  private def mapDate: String => String = (x: String) => x.substring(10).dropRight(2)
 
-  def mapTime: String => String = (x: String) => x.substring(10).dropRight(2)
+  private def mapTime: String => String = (x: String) => x.substring(10).dropRight(2)
 
-  def mapWRating: String => String = (x: String) => x.substring(11).dropRight(2)
+  private def mapWRating: String => String = (x: String) => x.substring(11).dropRight(2)
 
-  def mapBRating: String => String = (x: String) => x.substring(11).dropRight(2)
-
-  def mapWRatingLos: String => String = (x: String) => x.substring(16).dropRight(2)
-
-  def mapBRatingLos: String => String = (x: String) => x.substring(16).dropRight(2)
-
-  def mapECO: String => String = (x: String) => x.substring(6).dropRight(2)
-
-  def mapOpening: String => String = (x: String) => x.substring(10).dropRight(2)
-
-  def mapTimeControl: String => String = (x: String) => x.substring(14).dropRight(2)
-
-  def mapTermination: String => String = (x: String) => x.substring(14).dropRight(2)
+  private def mapBRating: String => String = (x: String) => x.substring(11).dropRight(2)
 
 
-  def swapValKey[T1, T2](res: (T1, T2)): (T2, T1) = {
+
+  private def mapECO: String => String = (x: String) => x.substring(6).dropRight(2)
+
+  private def mapOpening: String => String = (x: String) => x.substring(10).dropRight(2)
+
+  private def mapTimeControl: String => String = (x: String) => x.substring(14).dropRight(2)
+
+  private def mapTermination: String => String = (x: String) => x.substring(14).dropRight(2)
+
+
+  private def swapValKey[T1, T2](res: (T1, T2)): (T2, T1) = {
 
     (res._2, res._1)
   }
 
-  def flat[T1, T2, T3](res: (T1, T2)): (T2, T1) = {
 
-    (res._2, res._1)
-  }
-
-  def mapResult2(res: (String, Long)): (String, Long) = {
+  private def mapResult2(res: (String, Long)): (String, Long) = {
     if (res._1 == "1-0") {
 
       ("W", res._2)
@@ -122,7 +105,7 @@ object PGNExtractTransform {
 
     else if (res._1 == "0-1") {
 
-      ("B", res._2)
+      (BLACK, res._2)
     }
     else {
       ("D", res._2)
@@ -140,8 +123,7 @@ object PGNExtractTransform {
   }
 
   def pgnETtoTuple(sc: SparkContext, pgnPath: String = PGN_FILE):
-  RDD[(String, String, String, String, String, String, String,
-    String, String, String, String, String, String)] = {
+  RDD[GameTupleFormat] = {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
@@ -153,39 +135,37 @@ object PGNExtractTransform {
 
     val wPlayers = pgn_file.filter(filter_wight).zipWithIndex().map(transformMapFun(mapNames))
     val bPlayers = pgn_file.filter(filter_black).zipWithIndex().map(transformMapFun(mapNames))
-//        println("Players: ", wPlayers.count(), bPlayers.count())
-    println(wPlayers.map((f: (String, Long)) => f._1).distinct().count())
-    println(bPlayers.map((f: (String, Long)) => f._1).distinct().count())
-    val result = pgn_file.filter(filterResult).zipWithIndex().map(transformMapFun(mapResult)).map(mapResult2)
-//        println("result:", result.count())
+    //    println("Players: ", wPlayers.count(), bPlayers.count())
 
-//    wPlayers.foreach(println)
+    val result = pgn_file.filter(filterResult).zipWithIndex().map(transformMapFun(mapResult)).map(mapResult2)
+    //    println("result:", result.count())
+
+    //    wPlayers.foreach(println)
     val date = pgn_file.filter(filterDate).zipWithIndex().map(transformMapFun(mapDate))
-//        println("date:", date.count())
+    //    println("date:", date.count())
 
     val time = pgn_file.filter(filterTime).zipWithIndex().map(transformMapFun(mapTime))
-//        println("time:", time.count())
+    //    println("time:", time.count())
 
     val wRating = pgn_file.filter(filterWRating).zipWithIndex().map(transformMapFun(mapWRating))
     val bRating = pgn_file.filter(filterBRating).zipWithIndex().map(transformMapFun(mapBRating))
-//        println("Rating: ", wRating.count(), bRating.count())
+    //    println("Rating: ", wRating.count(), bRating.count())
 
 
     val eco = pgn_file.filter(filterECO).zipWithIndex().map(transformMapFun(mapECO))
-//        println("eco:", eco.count())
+    //    println("eco:", eco.count())
 
 
     val Opening = pgn_file.filter(filterOpening).zipWithIndex().map(transformMapFun(mapOpening))
-//        println("Opening:", Opening.count())
+    //    println("Opening:", Opening.count())
 
     val timeControl = pgn_file.filter(filterTimeControl).zipWithIndex().map(transformMapFun(mapTimeControl))
-//        println("timeControl:", timeControl.count())
+    //    println("timeControl:", timeControl.count())
 
     val Termination = pgn_file.filter(filterTermination).zipWithIndex().map(transformMapFun(mapTermination))
-//    println("Termination:", Termination.count())
+    //    println("Termination:", Termination.count())
 
-//    val plays = pgn_file.filter(filterPlays).zipWithIndex()
-//        println("plays:", plays.count())
+
 
 
     val gamesRDD = events.map(swapValKey)
@@ -200,9 +180,7 @@ object PGNExtractTransform {
       .join(Opening.map(swapValKey))
       .join(timeControl.map(swapValKey))
       .join(Termination.map(swapValKey))
-//      .join(plays.map(swapValKey))
 
-//    println(":",gamesRDD.map(s => s._2._1._1._1._1._1._1._1._1._1._1._1._1).distinct().count())
     gamesRDD.map(toFlatTuple)
 
 
@@ -219,17 +197,18 @@ object PGNExtractTransform {
   }
 
 
-  def row(f: (String, String, String, String, String, String,
-    String, String, String, String, String, String, String)): Row = {
+  private def row(f: GameTupleFormat): Row = {
 
     val gameRow = sql.Row(f)
     gameRow
   }
 
-  def toFlatTuple(f: (Long, (((((((((((String, String), String), String), String), String), String), String), String), String), String), String))) = {
-    val (gameId, (((((((((((event, wPlayerName), bPlayerName), winner), date), time), wRating), bRating), eco), opening), timeCtrl), termination)) = f
+  private def toFlatTuple(f: GameJoinFormat): GameTupleFormat = {
+    val (gameId, (((((((((((event, wPlayerName), bPlayerName), winner),
+    date), time), wRating), bRating), eco), opening), timeCtrl), termination)) = f
 
-    (gameId.toString, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco, opening, timeCtrl, date, time, termination)
+    (gameId.toString, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco,
+      opening, timeCtrl, date, time, termination)
 
   }
 
