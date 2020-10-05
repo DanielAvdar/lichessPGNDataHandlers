@@ -154,12 +154,12 @@ object PGNExtractTransform {
     val wPlayers = pgn_file.filter(filter_wight).zipWithIndex().map(transformMapFun(mapNames))
     val bPlayers = pgn_file.filter(filter_black).zipWithIndex().map(transformMapFun(mapNames))
 //        println("Players: ", wPlayers.count(), bPlayers.count())
-//    println(wPlayers.map((f: (String, Long)) => f._1).distinct().count())
-//    println(bPlayers.map((f: (String, Long)) => f._1).distinct().count())
+    println(wPlayers.map((f: (String, Long)) => f._1).distinct().count())
+    println(bPlayers.map((f: (String, Long)) => f._1).distinct().count())
     val result = pgn_file.filter(filterResult).zipWithIndex().map(transformMapFun(mapResult)).map(mapResult2)
 //        println("result:", result.count())
 
-
+//    wPlayers.foreach(println)
     val date = pgn_file.filter(filterDate).zipWithIndex().map(transformMapFun(mapDate))
 //        println("date:", date.count())
 
