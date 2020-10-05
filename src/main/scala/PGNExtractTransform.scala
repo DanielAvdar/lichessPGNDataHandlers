@@ -1,4 +1,4 @@
-import Property.{BLACK, GameJoinFormat, GameTupleFormat}
+import Property.{BLACK, DRAW, GameJoinFormat, GameTupleFormat, WHITE}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
@@ -98,7 +98,7 @@ object PGNExtractTransform {
   private def mapResult2(res: (String, Long)): (String, Long) = {
     if (res._1 == "1-0") {
 
-      ("W", res._2)
+      (WHITE, res._2)
 
     }
 
@@ -108,7 +108,7 @@ object PGNExtractTransform {
       (BLACK, res._2)
     }
     else {
-      ("D", res._2)
+      (DRAW, res._2)
     }
   }
 

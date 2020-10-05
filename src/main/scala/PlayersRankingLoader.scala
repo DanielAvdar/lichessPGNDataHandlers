@@ -43,14 +43,8 @@ object PlayersRankingLoader {
 
 
 
-
-
-
-
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setMaster("local[12]").setAppName("lichess")
-      .set("spark.executor.memory", "4G")
-      .set("spark.driver.memory", "4G")
     val sc = new SparkContext(conf)
 
 
@@ -118,7 +112,7 @@ object PlayersRankingLoader {
     }
 
 
-    if (f.attr._4 == "W") {
+    if (f.attr._4 == WHITE) {
       assert(f.srcAttr != null)
       ((f.srcId, f.srcAttr), rating)
     } else {
@@ -151,7 +145,7 @@ object PlayersRankingLoader {
     val games = PGNExtractTransform.pgnETtoTuple(sc, pgnPath)
 
 
-    val edges = games.map(mapToEdge).filter(f => f.attr._4 != "D")
+    val edges = games.map(mapToEdge).filter(f => f.attr._4 != DRAW)
     val vertexes = games.map(wMapTupToVertex).distinct().union(games.map(bMapTupToVertex).distinct()).distinct()
 
     val graph = Graph(vertexes, edges)
