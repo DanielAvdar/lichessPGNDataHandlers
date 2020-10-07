@@ -127,7 +127,7 @@ object PGNExtractTransform {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
-      .persist(storage.StorageLevel.MEMORY_ONLY_SER)
+      .cache()
 
     val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
       .map(transformMapFun(mapEventsFarther))

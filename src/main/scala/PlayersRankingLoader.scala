@@ -1,6 +1,6 @@
 import GamesLoader.UUIDLong
 import Property._
-import org.apache.spark.graphx.{Edge, Graph, VertexId}
+import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Row, SparkSession}
@@ -35,12 +35,8 @@ object PlayersRankingLoader {
   }
 
   def toVal2(f: (VertexId, (Option[Double], Option[Double]))): (VertexId, (Double, Double)) = {
-    (f._1, (f._2._1.getOrElse(0), f._2._2.getOrElse(1)))
+    (f._1, (f._2._1.getOrElse(0), f._2._2.getOrElse(0)))
   }
-
-
-
-
 
 
   def main(args: Array[String]): Unit = {
@@ -76,7 +72,7 @@ object PlayersRankingLoader {
   }
 
 
-  def wMapTupToVertex(t:GameTupleFormat): (VertexId, String) = {
+  def wMapTupToVertex(t: GameTupleFormat): (VertexId, String) = {
     val (_, _, wPlayerName, _,
     _, _, _, _, _, _,
     _, _, _) = t
@@ -101,8 +97,6 @@ object PlayersRankingLoader {
 
 
   }
-
-
 
 
   def wPlayerRatingAndName(f: EdgeTripletFormat): PlayerRatingAndNameFormat = {
@@ -141,42 +135,38 @@ object PlayersRankingLoader {
   }
 
 
-  def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = Property.PGN_FILE, prItr: Int = 10): RDD[Row] = {
-    val games = PGNExtractTransform.pgnETtoTuple(sc, pgnPath)
+  //  def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = Property.PGN_FILE): RDD[Row] = {
+  //
+  //
+  //  }
 
 
-    val edges = games.map(mapToEdge).filter(f => f.attr._4 != DRAW)
-    val vertexes = games.map(wMapTupToVertex).distinct().union(games.map(bMapTupToVertex).distinct()).distinct()
+  def getVertexes(games: RDD[GameTupleFormat]): RDD[(VertexId, String)] = {
+    games.map(wMapTupToVertex).distinct().union(games.map(bMapTupToVertex).distinct()).distinct()
 
-    val graph = Graph(vertexes, edges)
-    val graphClass = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("C")))
-    val graphBullet = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("Bullet")))
-    val graphBlitz = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("Blitz")))
-    val innerPRgraph = graph.staticPageRank(prItr).vertices //.foreach(println)
-    val outerPRgraph = graph.reverse.staticPageRank(prItr).vertices //    .foreach(println)
-    val innerPRgraphClass = graphClass.staticPageRank(prItr).vertices //   .foreach(println)
-    val outerPRgraphClass = graphClass.reverse.staticPageRank(prItr).vertices //    .foreach(println)
-    val innerPRgraphBullet = graphBullet.staticPageRank(prItr).vertices //.foreach(println)
-    val outerPRgraphBullet = graphBullet.reverse.staticPageRank(prItr).vertices //   .foreach(println)
-    val innerPRgraphBlitz = graphBlitz.staticPageRank(prItr).vertices //.foreach(println)
-    val outerPRgraphBlitz = graphBlitz.reverse.staticPageRank(prItr).vertices //   .foreach(println)
+  }
+
+  private def getEdges(games: RDD[GameTupleFormat]) = {
+    games.map(mapToEdge).filter(f => f.attr._4 != DRAW)
+  }
+
+
+  def getPageRang(graph: GraphFormat, prItr: Int): VertexRDD[Double] = {
+
+    graph.staticPageRank(prItr).vertices
+
+  }
+
+
+  def getGamesPlayedRecords(graph: GraphFormat): (VertexRDD[Int], VertexRDD[Int], VertexRDD[Int]) = {
+
     val numOfGames = graph.degrees
     val numOfWins = graph.outDegrees
     val numOfLoses = graph.inDegrees
+    (numOfGames, numOfWins, numOfLoses)
+  }
 
-    val numOfGamesClass = graphClass.degrees
-    val numOfWinsClass = graphClass.outDegrees
-    val numOfLosesClass = graphClass.inDegrees
-
-    val numOfGamesBullet = graphBullet.degrees
-    val numOfWinsBullet = graphBullet.outDegrees
-    val numOfLosesBullet = graphBullet.inDegrees
-
-    val numOfGamesBlitz = graphBlitz.degrees
-    val numOfWinsBlitz = graphBlitz.outDegrees
-    val numOfLosesBlitz = graphBlitz.inDegrees
-
-
+  def getPlayersAvgRating(graph: GraphFormat, vertexes: RDD[(VertexId, String)]) = {
     val wPlayer = graph.triplets.map(wPlayerRatingAndName).distinct()
     val bPlayer = graph.triplets.map(bPlayerRatingAndName).distinct()
     val wPlayerRating = wPlayer.map(f => (f._1._1, f._2))
@@ -186,19 +176,84 @@ object PlayersRankingLoader {
 
     val PlayerRating = bPlayerRating.union(wPlayerRating).groupByKey()
       .aggregateByKey(0)((a, b) => a + b.sum / b.size, (a, b) => a + b).distinct()
+    PlayerRating
+  }
+
+  def getWinLosRatio(numOfWins: VertexRDD[Int], numOfLoses: VertexRDD[Int]) = {
+    numOfWins.fullOuterJoin(numOfLoses).map(toVal).map(toRatio)
+  }
+
+  def getPRRatio(outerPRgraph: VertexRDD[Double], innerPRgraph: VertexRDD[Double]) = {
+    outerPRgraph.fullOuterJoin(innerPRgraph).map(toVal2).map(toRatio2)
+
+  }
+
+  def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = Property.PGN_FILE, prItr: Int = 10): RDD[Row] = {
+    val games = PGNExtractTransform.pgnETtoTuple(sc, pgnPath)
 
 
+    val edges = getEdges(games)
+    val vertexes = getVertexes(games) //games.map(wMapTupToVertex).distinct().union(games.map(bMapTupToVertex).distinct()).distinct()
 
-    val winLosRatio = numOfWins.fullOuterJoin(numOfLoses).map(toVal).map(toRatio)
-    val winLosRatioClass = numOfWinsClass.fullOuterJoin(numOfLosesClass).map(toVal).map(toRatio)
-    val winLosRatioBullet = numOfWinsBullet.fullOuterJoin(numOfLosesBullet).map(toVal).map(toRatio)
-    val winLosRatioBlitz = numOfWinsBlitz.fullOuterJoin(numOfLosesBlitz).map(toVal).map(toRatio)
+    val graph = Graph(vertexes, edges)
+    val graphClass = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("C")))
+    val graphBullet = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("Bullet")))
+    val graphBlitz = Graph(vertexes, edges.filter(f => f.attr._1.startsWith("Blitz")))
+
+    val innerPRgraph = getPageRang(graph, prItr) // graph.staticPageRank(prItr).vertices //.foreach(println)
+    val outerPRgraph = getPageRang(graph.reverse, prItr) //graph.reverse.staticPageRank(prItr).vertices //    .foreach(println)
+    val innerPRgraphClass = getPageRang(graphClass, prItr) //graphClass.staticPageRank(prItr).vertices //   .foreach(println)
+    val outerPRgraphClass = getPageRang(graphClass.reverse, prItr) //graphClass.reverse.staticPageRank(prItr).vertices //    .foreach(println)
+    val innerPRgraphBullet = getPageRang(graphBullet, prItr) //graphBullet.staticPageRank(prItr).vertices //.foreach(println)
+    val outerPRgraphBullet = getPageRang(graphBullet.reverse, prItr) //graphBullet.reverse.staticPageRank(prItr).vertices //   .foreach(println)
+    val innerPRgraphBlitz = getPageRang(graphBlitz, prItr) //graphBlitz.staticPageRank(prItr).vertices //.foreach(println)
+    val outerPRgraphBlitz = getPageRang(graphBlitz.reverse, prItr) //graphBlitz.reverse.staticPageRank(prItr).vertices //   .foreach(println)
 
 
-    val PRRatio = outerPRgraph.fullOuterJoin(innerPRgraph).map(toVal2).map(toRatio2)
-    val PRRatioClass = outerPRgraphClass.fullOuterJoin(innerPRgraphClass).map(toVal2).map(toRatio2)
-    val PRRatioBullet = outerPRgraphBullet.fullOuterJoin(innerPRgraphBullet).map(toVal2).map(toRatio2)
-    val PRRatioBlitz = outerPRgraphBlitz.fullOuterJoin(innerPRgraphBlitz).map(toVal2).map(toRatio2)
+    //    val numOfGames = graph.degrees
+    //    val numOfWins = graph.outDegrees
+    //    val numOfLoses = graph.inDegrees
+    val (numOfGames, numOfWins, numOfLoses) = getGamesPlayedRecords(graph)
+
+    //    val numOfGamesClass = graphClass.degrees
+    //    val numOfWinsClass = graphClass.outDegrees
+    //    val numOfLosesClass = graphClass.inDegrees
+    val (numOfGamesClass, numOfWinsClass, numOfLosesClass) = getGamesPlayedRecords(graph)
+
+    //    val numOfGamesBullet = graphBullet.degrees
+    //    val numOfWinsBullet = graphBullet.outDegrees
+    //    val numOfLosesBullet = graphBullet.inDegrees
+    val (numOfGamesBullet, numOfWinsBullet, numOfLosesBullet) = getGamesPlayedRecords(graph)
+
+    //    val numOfGamesBlitz = graphBlitz.degrees
+    //    val numOfWinsBlitz = graphBlitz.outDegrees
+    //    val numOfLosesBlitz = graphBlitz.inDegrees
+    val (numOfGamesBlitz, numOfWinsBlitz, numOfLosesBlitz) = getGamesPlayedRecords(graph)
+    //
+    //    val wPlayer = graph.triplets.map(wPlayerRatingAndName).distinct()
+    //    val bPlayer = graph.triplets.map(bPlayerRatingAndName).distinct()
+    //    val wPlayerRating = wPlayer.map(f => (f._1._1, f._2))
+    //    val bPlayerRating = bPlayer.map(f => (f._1._1, f._2))
+    //
+    //    val playerName = vertexes
+    //
+    //    val PlayerRating = bPlayerRating.union(wPlayerRating).groupByKey()
+    //      .aggregateByKey(0)((a, b) => a + b.sum / b.size, (a, b) => a + b).distinct()
+    val playerName = vertexes
+    val PlayerRating = getPlayersAvgRating(graph, vertexes)
+
+
+    val winLosRatio = getWinLosRatio(numOfWins, numOfLoses) //numOfWins.fullOuterJoin(numOfLoses).map(toVal).map(toRatio)
+    val winLosRatioClass = getWinLosRatio(numOfWinsClass, numOfLosesClass) // numOfWinsClass.fullOuterJoin(numOfLosesClass).map(toVal).map(toRatio)
+    val winLosRatioBullet = getWinLosRatio(numOfWinsBullet, numOfLosesBullet) //numOfWinsBullet.fullOuterJoin(numOfLosesBullet).map(toVal).map(toRatio)
+    val winLosRatioBlitz = getWinLosRatio(numOfWinsBlitz, numOfLosesBlitz) // numOfWinsBlitz.fullOuterJoin(numOfLosesBlitz).map(toVal).map(toRatio)
+    //    getWinLosRatio(numOfWins,numOfLoses)
+
+    val PRRatio = getPRRatio(outerPRgraph, innerPRgraph) //outerPRgraph.fullOuterJoin(innerPRgraph).map(toVal2).map(toRatio2)
+    val PRRatioClass = getPRRatio(outerPRgraphClass, innerPRgraphClass) // outerPRgraphClass.fullOuterJoin(innerPRgraphClass).map(toVal2).map(toRatio2)
+    val PRRatioBullet = getPRRatio(outerPRgraphBullet, innerPRgraphBullet) //outerPRgraphBullet.fullOuterJoin(innerPRgraphBullet).map(toVal2).map(toRatio2)
+    val PRRatioBlitz = getPRRatio(outerPRgraphBlitz, innerPRgraphBlitz) //outerPRgraphBlitz.fullOuterJoin(innerPRgraphBlitz).map(toVal2).map(toRatio2)
+    //    getPRRatio(outerPRgraph,innerPRgraph)
 
 
     val finalData = playerName.map(f => (f._1, Row(f._2)))
@@ -224,10 +279,6 @@ object PlayersRankingLoader {
 
     finalData
   }
-
-
-
-
 
 
   def playersRowRDDtoCSV(sc: SparkContext, pgnPath: String = Property.PGN_FILE): Unit = {

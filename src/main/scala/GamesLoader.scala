@@ -30,7 +30,7 @@ object GamesLoader {
     val sc = new SparkContext(conf)
 
 
-    PlayersRankingLoader.playersRowRDDtoCSV(sc, Property.PGN_FILE2)
+    PlayersRankingLoader.playersRowRDDtoCSV(sc, Property.PGN_FILE)
 
 
   }
