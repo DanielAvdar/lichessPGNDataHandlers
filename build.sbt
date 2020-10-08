@@ -6,14 +6,14 @@ version := "0.1"
 
 scalaVersion := "2.12.4"
 resolvers += "Spark Packages Repo" at "http://dl.bintray.com/spark-packages/maven"
-resolvers += "Spark Packages Repo" at "https://mvnrepository.com/artifact/org.apache.spark/spark-streaming"
+//resolvers += "Spark Packages Repo" at "https://mvnrepository.com/artifact/org.apache.spark/spark-streaming"
 
 //def libraryDependencies =
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % "2.4.7"
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "2.4.7"
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.7"
-
+libraryDependencies += "org.apache.spark" %% "spark-mllib" % "2.4.7"
 
 
 

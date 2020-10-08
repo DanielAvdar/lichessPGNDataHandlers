@@ -9,32 +9,32 @@ import org.apache.spark.{SparkConf, SparkContext}
 object PlayersRankingLoader {
 
 
-  def toRow(f: (VertexId, (Row, Option[Double]))): (VertexId, Row) = {
+  private def toRow(f: (VertexId, (Row, Option[Double]))): (VertexId, Row) = {
 
     (f._1, Row.merge(f._2._1, Row(f._2._2.getOrElse(0.0))))
 
   }
 
-  def toRow2(f: (VertexId, (Row, Option[Int]))): (VertexId, Row) = {
+  private def toRow2(f: (VertexId, (Row, Option[Int]))): (VertexId, Row) = {
 
     (f._1, Row.merge(f._2._1, Row(f._2._2.getOrElse(0))))
 
   }
 
 
-  def toRatio(f: (VertexId, (Int, Int))): (VertexId, Double) = {
+  private def toRatio(f: (VertexId, (Int, Int))): (VertexId, Double) = {
     (f._1, f._2._1.toDouble / f._2._2.toDouble)
   }
 
-  def toRatio2(f: (VertexId, (Double, Double))): (VertexId, Double) = {
+  private def toRatio2(f: (VertexId, (Double, Double))): (VertexId, Double) = {
     (f._1, f._2._1 / f._2._2)
   }
 
-  def toVal(f: (VertexId, (Option[Int], Option[Int]))): (VertexId, (Int, Int)) = {
+  private def toVal(f: (VertexId, (Option[Int], Option[Int]))): (VertexId, (Int, Int)) = {
     (f._1, (f._2._1.getOrElse(0), f._2._2.getOrElse(1)))
   }
 
-  def toVal2(f: (VertexId, (Option[Double], Option[Double]))): (VertexId, (Double, Double)) = {
+  private def toVal2(f: (VertexId, (Option[Double], Option[Double]))): (VertexId, (Double, Double)) = {
     (f._1, (f._2._1.getOrElse(0), f._2._2.getOrElse(0)))
   }
 
@@ -44,12 +44,12 @@ object PlayersRankingLoader {
     val sc = new SparkContext(conf)
 
 
-    playersRowRDDtoCSV(sc, Property.PGN_FILE)
+    playersRanRowRDDtoCSV(sc, Property.PGN_FILE)
 
 
   }
 
-  def mapToEdge(t: GameTupleFormat):
+  private def mapToEdge(t: GameTupleFormat):
   EdgeFormat = {
     val (_, event, wPlayerName, bPlayerName,
     winner, wRating, bRating, eco, opening, timeCtrl,
@@ -72,7 +72,7 @@ object PlayersRankingLoader {
   }
 
 
-  def wMapTupToVertex(t: GameTupleFormat): (VertexId, String) = {
+  private def wMapTupToVertex(t: GameTupleFormat): (VertexId, String) = {
     val (_, _, wPlayerName, _,
     _, _, _, _, _, _,
     _, _, _) = t
@@ -85,7 +85,7 @@ object PlayersRankingLoader {
 
   }
 
-  def bMapTupToVertex(t: GameTupleFormat): (VertexId, String) = {
+  private def bMapTupToVertex(t: GameTupleFormat): (VertexId, String) = {
     val (_, _, _, bPlayerName,
     _, _, _, _, _, _,
     _, _, _) = t
@@ -99,7 +99,7 @@ object PlayersRankingLoader {
   }
 
 
-  def wPlayerRatingAndName(f: EdgeTripletFormat): PlayerRatingAndNameFormat = {
+  private def wPlayerRatingAndName(f: EdgeTripletFormat): PlayerRatingAndNameFormat = {
     var rating = 0
     if (f.attr._5 != "?") {
       rating = f.attr._5.toInt
@@ -116,7 +116,7 @@ object PlayersRankingLoader {
 
   }
 
-  def bPlayerRatingAndName(f: EdgeTripletFormat): PlayerRatingAndNameFormat = {
+  private def bPlayerRatingAndName(f: EdgeTripletFormat): PlayerRatingAndNameFormat = {
     var rating = 0
     if (f.attr._6 != "?") {
       rating = f.attr._6.toInt
@@ -135,13 +135,7 @@ object PlayersRankingLoader {
   }
 
 
-  //  def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = Property.PGN_FILE): RDD[Row] = {
-  //
-  //
-  //  }
-
-
-  def getVertexes(games: RDD[GameTupleFormat]): RDD[(VertexId, String)] = {
+  private def getVertexes(games: RDD[GameTupleFormat]): RDD[(VertexId, String)] = {
     games.map(wMapTupToVertex).distinct().union(games.map(bMapTupToVertex).distinct()).distinct()
 
   }
@@ -151,14 +145,14 @@ object PlayersRankingLoader {
   }
 
 
-  def getPageRang(graph: GraphFormat, prItr: Int): VertexRDD[Double] = {
+  private def getPageRang(graph: GraphFormat, prItr: Int): VertexRDD[Double] = {
 
     graph.staticPageRank(prItr).vertices
 
   }
 
 
-  def getGamesPlayedRecords(graph: GraphFormat): (VertexRDD[Int], VertexRDD[Int], VertexRDD[Int]) = {
+  private def getGamesPlayedRecords(graph: GraphFormat): (VertexRDD[Int], VertexRDD[Int], VertexRDD[Int]) = {
 
     val numOfGames = graph.degrees
     val numOfWins = graph.outDegrees
@@ -166,7 +160,7 @@ object PlayersRankingLoader {
     (numOfGames, numOfWins, numOfLoses)
   }
 
-  def getPlayersAvgRating(graph: GraphFormat, vertexes: RDD[(VertexId, String)]) = {
+  private def getPlayersAvgRating(graph: GraphFormat, vertexes: RDD[(VertexId, String)]): RDD[(VertexId, Int)] = {
     val wPlayer = graph.triplets.map(wPlayerRatingAndName).distinct()
     val bPlayer = graph.triplets.map(bPlayerRatingAndName).distinct()
     val wPlayerRating = wPlayer.map(f => (f._1._1, f._2))
@@ -179,16 +173,16 @@ object PlayersRankingLoader {
     PlayerRating
   }
 
-  def getWinLosRatio(numOfWins: VertexRDD[Int], numOfLoses: VertexRDD[Int]) = {
+  private def getWinLosRatio(numOfWins: VertexRDD[Int], numOfLoses: VertexRDD[Int]): RDD[(VertexId, Double)] = {
     numOfWins.fullOuterJoin(numOfLoses).map(toVal).map(toRatio)
   }
 
-  def getPRRatio(outerPRgraph: VertexRDD[Double], innerPRgraph: VertexRDD[Double]) = {
+  private def getPRRatio(outerPRgraph: VertexRDD[Double], innerPRgraph: VertexRDD[Double]): RDD[(VertexId, Double)] = {
     outerPRgraph.fullOuterJoin(innerPRgraph).map(toVal2).map(toRatio2)
 
   }
 
-  def tupleRDDtoGraphx(sc: SparkContext, pgnPath: String = Property.PGN_FILE, prItr: Int = 10): RDD[Row] = {
+  def tupleRDDtoPlayersRankingRdd(sc: SparkContext, pgnPath: String = Property.PGN_FILE, prItr: Int = 10): RDD[Row] = {
     val games = PGNExtractTransform.pgnETtoTuple(sc, pgnPath)
 
 
@@ -281,11 +275,11 @@ object PlayersRankingLoader {
   }
 
 
-  def playersRowRDDtoCSV(sc: SparkContext, pgnPath: String = Property.PGN_FILE): Unit = {
+  def playersRanRowRDDtoCSV(sc: SparkContext, pgnPath: String = Property.PGN_FILE): Unit = {
 
 
     val spark = new SparkSession.Builder().master("local[9]").appName("lichess").getOrCreate()
-    val gameTup = tupleRDDtoGraphx(sc, pgnPath)
+    val gameTup = tupleRDDtoPlayersRankingRdd(sc, pgnPath)
 
 
     val df = spark.createDataFrame(gameTup, StructType(rankinSchema))
