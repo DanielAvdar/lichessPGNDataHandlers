@@ -26,24 +26,27 @@ object Property {
     "numOfGames" -> IntegerType, "numOfGamesClass" -> IntegerType,
     "numOfGamesBullet" -> IntegerType, "numOfGamesBlitz" -> IntegerType)
     .withDefault((_: String) => DoubleType)
-  val rankinSchema: Seq[StructField] = Seq("name", "rating",
+  val rankinSchema: Seq[StructField] = Seq(
+    "name",//0
+    "rating",//1
 
 
-    "numOfGames",
-    "WinLosRatio",
-    "TotalPRRatio",
+    "numOfGames",//2
+    "WinLosRatio",//3
+    "TotalPRRatio",//4
 
-    "numOfGamesClass",
-    "winLosRatioClass",
-    "PRRatioClass",
+    "numOfGamesClass",//5
+    "winLosRatioClass",//6
+    "PRRatioClass",//7
 
-    "numOfGamesBullet",
-    "winLosRatioBullet",
-    "PRRatioBullet",
+    "numOfGamesBullet",//8
+    "winLosRatioBullet",//9
+    "PRRatioBullet",//10
 
-    "numOfGamesBlitz",
-    "winLosRatioBlitz",
-    "PRRatioBlitz",
+    "numOfGamesBlitz",//11
+    "winLosRatioBlitz",//12
+    "PRRatioBlitz",//13
+
   ).map(field => StructField(field, mapper(field), nullable = field != "name"))
 
 
