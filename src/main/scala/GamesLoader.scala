@@ -8,7 +8,20 @@ import org.apache.spark.sql.types._
 
 object GamesLoader {
 
-  def UUIDLong: String => Long = s => UUID.nameUUIDFromBytes(s.getBytes()).getLeastSignificantBits.abs
+  def UUIDLong: String => Long = s => UUID.nameUUIDFromBytes(s.getBytes()).getLeastSignificantBits
+  def rowRDDtoDataframe(sc: SparkContext, pgnPath: String = Property.PGN_FILE): Unit = {
+
+
+    val spark = new SparkSession.Builder().master("local[9]").appName("lichess").getOrCreate()
+    val gameTup = PGNExtractTransform.pgnETtoRowRDD(sc, pgnPath)
+
+    val df = spark.createDataFrame(gameTup, StructType(Property.gameSchema))
+
+
+    df.write.format("csv").option("header", value = true).mode("overwrite").save(Property.csvPath)
+
+
+  }
   def rowRDDtoCSV(sc: SparkContext, pgnPath: String = Property.PGN_FILE): Unit = {
 
 
@@ -30,7 +43,7 @@ object GamesLoader {
     val sc = new SparkContext(conf)
 
 
-//    PlayersRankingLoader.playersRowRDDtoCSV(sc, Property.PGN_FILE)
+    rowRDDtoCSV(sc)
 
 
   }

@@ -29,7 +29,6 @@ object PGNExtractTransform {
   private def filterBRating: String => Boolean = (x: String) => x.startsWith("[BlackElo ")
 
 
-
   private def filterECO: String => Boolean = (x: String) => x.startsWith("[ECO ")
 
   private def filterOpening: String => Boolean = (x: String) => x.startsWith("[Opening ")
@@ -39,8 +38,7 @@ object PGNExtractTransform {
   private def filterTermination: String => Boolean = (x: String) => x.startsWith("[Termination ")
 
 
-
-  private def transformMapFun[T1, T2](mapper: (T1) => (T2)): ((T1, Long)) => ((T2, Long)) = {
+  private def transformMapFun[T1, T2](mapper: T1 => T2): ((T1, Long)) => (T2, Long) = {
 
 
     def transformFun = (s: (T1, Long)) => (mapper(s._1), s._2)
@@ -49,7 +47,6 @@ object PGNExtractTransform {
     transformFun
 
   }
-
 
 
   private def mapNames: String => String = (x: String) => x.substring(8).dropRight(2)
@@ -77,7 +74,6 @@ object PGNExtractTransform {
   private def mapWRating: String => String = (x: String) => x.substring(11).dropRight(2)
 
   private def mapBRating: String => String = (x: String) => x.substring(11).dropRight(2)
-
 
 
   private def mapECO: String => String = (x: String) => x.substring(6).dropRight(2)
@@ -113,20 +109,21 @@ object PGNExtractTransform {
   }
 
 
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-    val sc = new SparkContext(conf)
-    val games = pgnETtoRowRDD(sc)
-    games.foreach(println)
-
-
-  }
+  //  def main(args: Array[String]): Unit = {
+  //    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
+  //    val sc = new SparkContext(conf)
+  //    val games = pgnETtoRowRDD(sc)
+  //    games.foreach(println)
+  //
+  //
+  //  }
 
   def pgnETtoTuple(sc: SparkContext, pgnPath: String = PGN_FILE):
   RDD[GameTupleFormat] = {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
+      //      .repartition(1000)
       .cache()
 
     val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
@@ -166,6 +163,10 @@ object PGNExtractTransform {
     //    println("Termination:", Termination.count())
 
 
+    pgn_file.unpersist()
+    println("ETL start joins")
+
+
 
 
     val gamesRDD = events.map(swapValKey)
@@ -180,7 +181,6 @@ object PGNExtractTransform {
       .join(Opening.map(swapValKey))
       .join(timeControl.map(swapValKey))
       .join(Termination.map(swapValKey))
-
     gamesRDD.map(toFlatTuple)
 
 
@@ -191,15 +191,18 @@ object PGNExtractTransform {
 
     val gamesRDD = pgnETtoTuple(sc, pgnPath)
 
-    gamesRDD.map(row)
+    gamesRDD.map(tupleToRowFormat)
 
 
   }
 
 
-  private def row(f: GameTupleFormat): Row = {
-
-    val gameRow = sql.Row(f)
+  def tupleToRowFormat(f: GameTupleFormat): Row = {
+    val (_, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco,
+    opening, timeCtrl, date, time, termination) = f
+    val f2 = (event, wPlayerName, bPlayerName, winner, wRating, bRating, eco,
+      opening, timeCtrl, date, time, termination)
+    val gameRow = sql.Row.fromTuple(f2)
     gameRow
   }
 
