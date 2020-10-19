@@ -1,5 +1,6 @@
 
 import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, VertexId}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types._
 
 
@@ -9,6 +10,9 @@ object Property {
   val BLACK = "B"
   val WHITE = "W"
   val DRAW = "D"
+  val CLASSIC="Classical"
+  val BULLET="Bullet"
+  val Blitz="Blitz"
 
   val DIRECTORY = "C:\\tmp_test\\"
   //todo replace
@@ -23,6 +27,8 @@ object Property {
     "numOfGames" -> IntegerType, "numOfGamesRapid" -> IntegerType,
     "numOfGamesClass" -> IntegerType,
     "numOfGamesBullet" -> IntegerType, "numOfGamesBlitz" -> IntegerType)
+    .withDefault((_: String) => DoubleType)
+  val mapper2 = Map("name" -> StringType)
     .withDefault((_: String) => DoubleType)
   val rankinSchema: Seq[StructField] = Seq(
     "name", //0
@@ -50,6 +56,22 @@ object Property {
 
   ).map(field => StructField(field, mapper(field), nullable = field != "name"))
 
+  val rankinSchema2: Seq[StructField] = Seq(
+    "name", //0
+
+    "innerPRgraph", //4
+    "innerPRgraphClass", //2
+    "innerPRgraphBullet", //3
+    "innerPRgraphBlitz", //7
+
+    "outerPRgraph", //5
+    "outerPRgraphClass", //6
+    "outerPRgraphBullet", //10
+    "outerPRgraphBlitz", //8
+
+
+  ).map(field => StructField(field, mapper2(field), nullable = field != "name"))
+
 
   val gameSchema: Seq[StructField] = Seq(
     //    "Id",
@@ -74,16 +96,25 @@ object Property {
 
   type GameTupleFormat = (String, String, String, String, String, String, String, String,
     String, String, String, String, String)
-
+  type GameTupleFormat2 = (Long, String, String, String, String)
   type GameJoinFormat = (Long, (((((((((((String, String), String), String), String),
     String), String), String), String),
     String), String), String))
+type rankingTupleFormat=   (RDD[(VertexId, String)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)],
+  RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)])
 
-  type EdgeFormat = Edge[(String, String, String, String, String,
+    type EdgeFormat = Edge[(String, String, String, String, String,
     String, String, String, String, String, String, String)]
+
+  type EdgeFormat2 = Edge[(Long, String, String, String, String)]
 
   type GraphFormat = Graph[String, (String, String, String,
     String, String, String, String, String, String, String, String, String)]
+  type GraphFormat2 = Graph[String, (Long, String, String, String, String)]
+  type TupleRDDsFormat =  (RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)])
 
 
 }

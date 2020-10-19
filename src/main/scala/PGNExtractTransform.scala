@@ -1,4 +1,4 @@
-import Property.{BLACK, DRAW, GameJoinFormat, GameTupleFormat, WHITE}
+import Property.{BLACK, DRAW, GameJoinFormat, GameTupleFormat, TupleRDDsFormat, WHITE}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
@@ -109,24 +109,17 @@ object PGNExtractTransform {
   }
 
 
-  //  def main(args: Array[String]): Unit = {
-  //    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-  //    val sc = new SparkContext(conf)
-  //    val games = pgnETtoRowRDD(sc)
-  //    games.foreach(println)
-  //
-  //
-  //  }
 
-  def pgnETtoTuple(sc: SparkContext, pgnPath: String = PGN_FILE):
-  RDD[GameTupleFormat] = {
+
+  def pgnETtoTupleRDDs(sc: SparkContext, pgnPath: String = PGN_FILE):
+  TupleRDDsFormat = {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
       //      .repartition(1000)
       .cache()
 
-    val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
+    val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))//todo get rid of zipWithIndex
       .map(transformMapFun(mapEventsFarther))
 
 
@@ -153,13 +146,13 @@ object PGNExtractTransform {
     //    println("eco:", eco.count())
 
 
-    val Opening = pgn_file.filter(filterOpening).zipWithIndex().map(transformMapFun(mapOpening))
+    val opening = pgn_file.filter(filterOpening).zipWithIndex().map(transformMapFun(mapOpening))
     //    println("Opening:", Opening.count())
 
     val timeControl = pgn_file.filter(filterTimeControl).zipWithIndex().map(transformMapFun(mapTimeControl))
     //    println("timeControl:", timeControl.count())
 
-    val Termination = pgn_file.filter(filterTermination).zipWithIndex().map(transformMapFun(mapTermination))
+    val termination = pgn_file.filter(filterTermination).zipWithIndex().map(transformMapFun(mapTermination))
     //    println("Termination:", Termination.count())
 
 
@@ -167,20 +160,53 @@ object PGNExtractTransform {
     println("ETL start joins")
 
 
+    (
+      events.map(swapValKey),//todo map to up
+      wPlayers.map(swapValKey),
+      bPlayers.map(swapValKey),
+      result.map(swapValKey),
+      date.map(swapValKey),
+      time.map(swapValKey),
+      wRating.map(swapValKey),
+      bRating.map(swapValKey),
+      eco.map(swapValKey),
+      opening.map(swapValKey),
+      timeControl.map(swapValKey),
+      termination.map(swapValKey)
+    )
+
+  }
 
 
-    val gamesRDD = events.map(swapValKey)
-      .join(wPlayers.map(swapValKey))
-      .join(bPlayers.map(swapValKey))
-      .join(result.map(swapValKey))
-      .join(date.map(swapValKey))
-      .join(time.map(swapValKey))
-      .join(wRating.map(swapValKey))
-      .join(bRating.map(swapValKey))
-      .join(eco.map(swapValKey))
-      .join(Opening.map(swapValKey))
-      .join(timeControl.map(swapValKey))
-      .join(Termination.map(swapValKey))
+  def TupleRDDsToJointTuple(sc: SparkContext, pgnPath: String):
+  RDD[GameTupleFormat] = {
+    val (
+      events,
+      wPlayers,
+      bPlayers,
+      result,
+      date,
+      time,
+      wRating,
+      bRating,
+      eco,
+      opening,
+      timeControl,
+      termination
+      ) = pgnETtoTupleRDDs(sc,pgnPath)
+
+    val gamesRDD = events
+      .join(wPlayers)
+      .join(bPlayers)
+      .join(result)
+      .join(date)
+      .join(time)
+      .join(wRating)
+      .join(bRating)
+      .join(eco)
+      .join(opening)
+      .join(timeControl)
+      .join(termination)
     gamesRDD.map(toFlatTuple)
 
 
@@ -189,7 +215,7 @@ object PGNExtractTransform {
   def pgnETtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
 
 
-    val gamesRDD = pgnETtoTuple(sc, pgnPath)
+    val gamesRDD = TupleRDDsToJointTuple(sc, pgnPath)
 
     gamesRDD.map(tupleToRowFormat)
 
