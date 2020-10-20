@@ -1,12 +1,10 @@
-import Property.{BLACK, DRAW, GameJoinFormat, GameTupleFormat, WHITE}
+import Property.{BLACK, BULLET, BLITZ, CLASSIC, DRAW, GameJoinFormat, GameTupleFormat, TupleRDDsFormat, WHITE}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 object PGNExtractTransform {
-  val DIRECTORY = "C:\\tmp_test\\"
-  //todo replace
-  val PGN_FILE: String = DIRECTORY + "lichess_db_standard_rated_2013-01.pgn.bz2" //todo replace
 
 
   private def filterNull: String => Boolean = (x: String) => x != ""
@@ -29,7 +27,6 @@ object PGNExtractTransform {
   private def filterBRating: String => Boolean = (x: String) => x.startsWith("[BlackElo ")
 
 
-
   private def filterECO: String => Boolean = (x: String) => x.startsWith("[ECO ")
 
   private def filterOpening: String => Boolean = (x: String) => x.startsWith("[Opening ")
@@ -39,8 +36,7 @@ object PGNExtractTransform {
   private def filterTermination: String => Boolean = (x: String) => x.startsWith("[Termination ")
 
 
-
-  private def transformMapFun[T1, T2](mapper: (T1) => (T2)): ((T1, Long)) => ((T2, Long)) = {
+  private def transformMapFun[T1, T2](mapper: T1 => T2): ((T1, Long)) => (T2, Long) = {
 
 
     def transformFun = (s: (T1, Long)) => (mapper(s._1), s._2)
@@ -51,18 +47,17 @@ object PGNExtractTransform {
   }
 
 
-
   private def mapNames: String => String = (x: String) => x.substring(8).dropRight(2)
 
   private def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
 
   private def mapEventsFarther(x: String): String = {
-    if (x.startsWith("Bullet"))
-      "Bullet"
-    else if (x.startsWith("Blitz"))
-      "Blitz"
-    else if (x.startsWith("Classical"))
-      "Classical"
+    if (x.startsWith(BULLET))
+      BULLET
+    else if (x.startsWith(BLITZ))
+      BLITZ
+    else if (x.startsWith(CLASSIC))
+      CLASSIC
     else
       "unknown event"
   }
@@ -79,7 +74,6 @@ object PGNExtractTransform {
   private def mapBRating: String => String = (x: String) => x.substring(11).dropRight(2)
 
 
-
   private def mapECO: String => String = (x: String) => x.substring(6).dropRight(2)
 
   private def mapOpening: String => String = (x: String) => x.substring(10).dropRight(2)
@@ -89,117 +83,166 @@ object PGNExtractTransform {
   private def mapTermination: String => String = (x: String) => x.substring(14).dropRight(2)
 
 
-  private def swapValKey[T1, T2](res: (T1, T2)): (T2, T1) = {
+  def swapValKey[T1, T2](res: (T1, T2)): (T2, T1) = {
 
     (res._2, res._1)
   }
 
 
-  private def mapResult2(res: (String, Long)): (String, Long) = {
-    if (res._1 == "1-0") {
+  private def mapResult2(res: String): String = {
+    if (res == "1-0") {
 
-      (WHITE, res._2)
+      WHITE
 
     }
 
 
-    else if (res._1 == "0-1") {
+    else if (res == "0-1") {
 
-      (BLACK, res._2)
+      BLACK
     }
     else {
-      (DRAW, res._2)
+      DRAW
     }
   }
 
 
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setMaster("local[9]").setAppName("lichess")
-    val sc = new SparkContext(conf)
-    val games = pgnETtoRowRDD(sc)
-    games.foreach(println)
-
-
-  }
-
-  def pgnETtoTuple(sc: SparkContext, pgnPath: String = PGN_FILE):
-  RDD[GameTupleFormat] = {
+  def pgnETtoTupleRDDs(sc: SparkContext, pgnPath: String): TupleRDDsFormat = {
 
 
     val pgn_file = sc.textFile(pgnPath).filter(filterNull)
+      //      .repartition(1000)
       .cache()
 
-    val events = pgn_file.filter(filterEvent).zipWithIndex().map(transformMapFun(mapEvents))
-      .map(transformMapFun(mapEventsFarther))
+    val events = pgn_file.filter(filterEvent).map(mapEvents)
+      .map(mapEventsFarther)
 
 
-    val wPlayers = pgn_file.filter(filter_wight).zipWithIndex().map(transformMapFun(mapNames))
-    val bPlayers = pgn_file.filter(filter_black).zipWithIndex().map(transformMapFun(mapNames))
+    val wPlayers = pgn_file.filter(filter_wight).map(mapNames)
+    val bPlayers = pgn_file.filter(filter_black).map(mapNames)
     //    println("Players: ", wPlayers.count(), bPlayers.count())
 
-    val result = pgn_file.filter(filterResult).zipWithIndex().map(transformMapFun(mapResult)).map(mapResult2)
+    val result = pgn_file.filter(filterResult).map(mapResult).map(mapResult2)
     //    println("result:", result.count())
 
     //    wPlayers.foreach(println)
-    val date = pgn_file.filter(filterDate).zipWithIndex().map(transformMapFun(mapDate))
+    val date = pgn_file.filter(filterDate).map(mapDate)
     //    println("date:", date.count())
 
-    val time = pgn_file.filter(filterTime).zipWithIndex().map(transformMapFun(mapTime))
+    val time = pgn_file.filter(filterTime).map(mapTime)
     //    println("time:", time.count())
 
-    val wRating = pgn_file.filter(filterWRating).zipWithIndex().map(transformMapFun(mapWRating))
-    val bRating = pgn_file.filter(filterBRating).zipWithIndex().map(transformMapFun(mapBRating))
+    val wRating = pgn_file.filter(filterWRating).map(mapWRating)
+    val bRating = pgn_file.filter(filterBRating).map(mapBRating)
     //    println("Rating: ", wRating.count(), bRating.count())
 
 
-    val eco = pgn_file.filter(filterECO).zipWithIndex().map(transformMapFun(mapECO))
+    val eco = pgn_file.filter(filterECO).map(mapECO)
     //    println("eco:", eco.count())
 
 
-    val Opening = pgn_file.filter(filterOpening).zipWithIndex().map(transformMapFun(mapOpening))
+    val opening = pgn_file.filter(filterOpening).map(mapOpening)
     //    println("Opening:", Opening.count())
 
-    val timeControl = pgn_file.filter(filterTimeControl).zipWithIndex().map(transformMapFun(mapTimeControl))
+    val timeControl = pgn_file.filter(filterTimeControl).map(mapTimeControl)
     //    println("timeControl:", timeControl.count())
 
-    val Termination = pgn_file.filter(filterTermination).zipWithIndex().map(transformMapFun(mapTermination))
+    val termination = pgn_file.filter(filterTermination).map(mapTermination)
     //    println("Termination:", Termination.count())
 
 
+    (
+      events,
+      wPlayers,
+      bPlayers,
+      result,
+      date,
+      time,
+      wRating,
+      bRating,
+      eco,
+      opening,
+      timeControl,
+      termination
+    )
+
+  }
 
 
-    val gamesRDD = events.map(swapValKey)
-      .join(wPlayers.map(swapValKey))
-      .join(bPlayers.map(swapValKey))
-      .join(result.map(swapValKey))
-      .join(date.map(swapValKey))
-      .join(time.map(swapValKey))
-      .join(wRating.map(swapValKey))
-      .join(bRating.map(swapValKey))
-      .join(eco.map(swapValKey))
-      .join(Opening.map(swapValKey))
-      .join(timeControl.map(swapValKey))
-      .join(Termination.map(swapValKey))
+  def TupleRDDsToJointTuple(sc: SparkContext, pgnPath: String):
+  RDD[GameTupleFormat] = {
+    val (
+      events,
+      wPlayers,
+      bPlayers,
+      result,
+      date,
+      time,
+      wRating,
+      bRating,
+      eco,
+      opening,
+      timeControl,
+      termination
+      ) = pgnETtoTupleRDDs(sc, pgnPath)
 
+    val gamesRDD = events.zipWithIndex().map(swapValKey)
+      .join(wPlayers.zipWithIndex().map(swapValKey))
+      .join(bPlayers.zipWithIndex().map(swapValKey))
+      .join(result.zipWithIndex().map(swapValKey))
+      .join(date.zipWithIndex().map(swapValKey))
+      .join(time.zipWithIndex().map(swapValKey))
+      .join(wRating.zipWithIndex().map(swapValKey))
+      .join(bRating.zipWithIndex().map(swapValKey))
+      .join(eco.zipWithIndex().map(swapValKey))
+      .join(opening.zipWithIndex().map(swapValKey))
+      .join(timeControl.zipWithIndex().map(swapValKey))
+      .join(termination.zipWithIndex().map(swapValKey))
     gamesRDD.map(toFlatTuple)
 
 
   }
 
-  def pgnETtoRowRDD(sc: SparkContext, pgnPath: String = PGN_FILE): RDD[Row] = {
+  def pgnETtoRowRDD(sc: SparkContext, pgnPath: String): RDD[Row] = {
 
 
-    val gamesRDD = pgnETtoTuple(sc, pgnPath)
+    val gamesRDD = TupleRDDsToJointTuple(sc, pgnPath)
 
-    gamesRDD.map(row)
+    gamesRDD.map(tupleToRowFormat)
+
+
+  }
+
+  def pgnETtoDataFrame(spark: SparkSession, pgnPath: String): DataFrame = {
+
+    val gamesRowRDD = pgnETtoRowRDD(spark.sparkContext, pgnPath)
+    spark.createDataFrame(gamesRowRDD, StructType(Property.gameSchema))
+
+  }
+
+  def rowRDDtoDataframe(sparkSession: SparkSession, pgnPath: String = Property.PGN_FILE): DataFrame = {
+
+
+    val gameTup = PGNExtractTransform.pgnETtoRowRDD(sparkSession.sparkContext, pgnPath)
+
+    val df = sparkSession.createDataFrame(gameTup, StructType(Property.gameSchema))
+
+
+    df
 
 
   }
 
 
-  private def row(f: GameTupleFormat): Row = {
+  //test
 
-    val gameRow = sql.Row(f)
+
+  def tupleToRowFormat(f: GameTupleFormat): Row = {
+    val (_, event, wPlayerName, bPlayerName, winner, wRating, bRating, eco,
+    opening, timeCtrl, date, time, termination) = f
+    val f2 = (event, wPlayerName, bPlayerName, winner, wRating, bRating, eco,
+      opening, timeCtrl, date, time, termination)
+    val gameRow = sql.Row.fromTuple(f2)
     gameRow
   }
 
@@ -212,5 +255,27 @@ object PGNExtractTransform {
 
   }
 
+  def rowRDDtoCSV(sparkSession: SparkSession, pgnPath: String = Property.PGN_FILE): Unit = {
 
+
+    val df = rowRDDtoDataframe(sparkSession, pgnPath)
+
+
+    df.write.format("csv").option("header", value = true).mode("overwrite").save(Property.csvPath)
+
+
+  }
+
+  //test
+  def main(args: Array[String]): Unit = {
+    val sparkSession = SparkSession
+      .builder()
+      .master("local[12]")
+      .appName("lichess")
+      .getOrCreate()
+    sparkSession.sparkContext.setLogLevel("ERROR")
+
+    rowRDDtoCSV(sparkSession)
+
+  }
 }
