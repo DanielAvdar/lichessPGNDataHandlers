@@ -1,4 +1,4 @@
-import Property.{BLACK, BULLET, BLITZ, CLASSIC, DRAW, GameJoinFormat, GameTupleFormat, TupleRDDsFormat, WHITE}
+import Property._
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
@@ -52,14 +52,8 @@ object PGNExtractTransform {
   private def mapEvents: String => String = (x: String) => x.substring(14).dropRight(2)
 
   private def mapEventsFarther(x: String): String = {
-    if (x.startsWith(BULLET))
-      BULLET
-    else if (x.startsWith(BLITZ))
-      BLITZ
-    else if (x.startsWith(CLASSIC))
-      CLASSIC
-    else
-      "unknown event"
+    x.split(" ")(0)
+
   }
 
 
@@ -106,48 +100,94 @@ object PGNExtractTransform {
     }
   }
 
+  private def unUsedDataFilter(data: String): Boolean = {
+    rankingUnUsedDataFilter(data)||
+    filterDate(data) ||
+      filterTime(data) ||
+      filterWRating(data) ||
+      filterBRating(data) ||
+      filterECO(data) ||
+      filterOpening(data) ||
+      filterTimeControl(data) ||
+      filterTermination(data)
 
-  def pgnETtoTupleRDDs(sc: SparkContext, pgnPath: String): TupleRDDsFormat = {
+  }
+
+  def rankingUnUsedDataFilter(data: String): Boolean = {
+    filterNull(data) ||
+      filterEvent(data) ||
+      filter_wight(data) ||
+      filter_black(data) ||
+      filterResult(data)
 
 
-    val pgn_file = sc.textFile(pgnPath).filter(filterNull)
-      //      .repartition(1000)
+  }
+
+  def pgnETtoTupleRDDs(sc: SparkContext, pgnPath: String, filterMethode: String => Boolean = unUsedDataFilter): TupleRDDsFormat = {
+
+
+    val pgn_file = sc.textFile(pgnPath)
+      .filter(filterMethode)
       .cache()
 
-    val events = pgn_file.filter(filterEvent).map(mapEvents)
+    val events = pgn_file
+      .filter(filterEvent)
+      .map(mapEvents)
       .map(mapEventsFarther)
 
 
-    val wPlayers = pgn_file.filter(filter_wight).map(mapNames)
-    val bPlayers = pgn_file.filter(filter_black).map(mapNames)
+    val wPlayers = pgn_file
+      .filter(filter_wight)
+      .map(mapNames)
+    val bPlayers = pgn_file
+      .filter(filter_black)
+      .map(mapNames)
     //    println("Players: ", wPlayers.count(), bPlayers.count())
 
-    val result = pgn_file.filter(filterResult).map(mapResult).map(mapResult2)
+    val result = pgn_file
+      .filter(filterResult)
+      .map(mapResult)
+      .map(mapResult2)
     //    println("result:", result.count())
 
-    //    wPlayers.foreach(println)
-    val date = pgn_file.filter(filterDate).map(mapDate)
+    val date = pgn_file
+      .filter(filterDate)
+      .map(mapDate)
     //    println("date:", date.count())
 
-    val time = pgn_file.filter(filterTime).map(mapTime)
+    val time = pgn_file
+      .filter(filterTime)
+      .map(mapTime)
     //    println("time:", time.count())
 
-    val wRating = pgn_file.filter(filterWRating).map(mapWRating)
-    val bRating = pgn_file.filter(filterBRating).map(mapBRating)
+    val wRating = pgn_file
+      .filter(filterWRating)
+      .map(mapWRating)
+    val bRating = pgn_file
+      .filter(filterBRating)
+      .map(mapBRating)
     //    println("Rating: ", wRating.count(), bRating.count())
 
 
-    val eco = pgn_file.filter(filterECO).map(mapECO)
+    val eco = pgn_file
+      .filter(filterECO)
+      .map(mapECO)
     //    println("eco:", eco.count())
 
 
-    val opening = pgn_file.filter(filterOpening).map(mapOpening)
+    val opening = pgn_file
+      .filter(filterOpening)
+      .map(mapOpening)
     //    println("Opening:", Opening.count())
 
-    val timeControl = pgn_file.filter(filterTimeControl).map(mapTimeControl)
+    val timeControl = pgn_file
+      .filter(filterTimeControl)
+      .map(mapTimeControl)
     //    println("timeControl:", timeControl.count())
 
-    val termination = pgn_file.filter(filterTermination).map(mapTermination)
+    val termination = pgn_file
+      .filter(filterTermination)
+      .map(mapTermination)
     //    println("Termination:", Termination.count())
 
 
@@ -186,7 +226,7 @@ object PGNExtractTransform {
       termination
       ) = pgnETtoTupleRDDs(sc, pgnPath)
 
-    val gamesRDD = events.zipWithIndex().map(swapValKey)
+    val gamesRDD = events.zipWithIndex().map(swapValKey).filter(f => Property.filterValidator(f._2))
       .join(wPlayers.zipWithIndex().map(swapValKey))
       .join(bPlayers.zipWithIndex().map(swapValKey))
       .join(result.zipWithIndex().map(swapValKey))

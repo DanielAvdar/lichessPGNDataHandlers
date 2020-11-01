@@ -83,7 +83,7 @@ object PlayersRanking {
     fGraph
   }
 
-  def tupleRDDtoPlayersRankingRdd3(games: TupleRDDsFormat, prItr: Int = 5): rankingTupleFormat = {
+  def tupleRDDtoPlayersRankingRdd3(games: TupleRDDsFormat, prItr: Int): rankingTupleFormat = {
     val (
       eventsRDD,
       wPlayersRDD,
@@ -99,10 +99,10 @@ object PlayersRanking {
       bPlayers,
       result
       ) = (
-      eventsRDD.zipWithIndex().map(swapValKey),
+      eventsRDD.zipWithIndex().map(swapValKey).filter(f => Property.filterValidator(f._2)),
       wPlayersRDD.zipWithIndex().map(swapValKey).cache(),
-      bPlayersRDD.zipWithIndex().map(swapValKey) cache(),
-      resultRDD.zipWithIndex().map(swapValKey)
+      bPlayersRDD.zipWithIndex().map(swapValKey).cache(),
+      resultRDD.zipWithIndex().map(swapValKey).filter(f => f._2 != DRAW)
     )
 
     println("tupleRDDtoPlayersRankingRdd")
@@ -116,6 +116,8 @@ object PlayersRanking {
     val graphClass = filterGraphByEvent(graph, CLASSIC).cache
     val graphBullet = filterGraphByEvent(graph, BULLET).cache
     val graphBlitz = filterGraphByEvent(graph, BLITZ).cache
+    val graphRapid = filterGraphByEvent(graph, RAPID).cache
+
     println("Graphs ready")
 
     println("Start ranking")
@@ -131,6 +133,10 @@ object PlayersRanking {
 
     val innerPRgraphBlitz = getPageRang(graphBlitz, prItr)
     val outerPRgraphBlitz = getPageRang(graphBlitz.reverse, prItr)
+
+    val innerPRgraphRapid = getPageRang(graphRapid, prItr)
+    val outerPRgraphRapid = getPageRang(graphRapid.reverse, prItr)
+
     println("Ranked")
     graphClass.unpersist()
     graphBullet.unpersist()
@@ -140,8 +146,18 @@ object PlayersRanking {
 
     (
       vertexes,
-      innerPRgraph.map(f => f), innerPRgraphClass.map(f => f), innerPRgraphBullet.map(f => f), innerPRgraphBlitz.map(f => f)
-      , outerPRgraph.map(f => f), outerPRgraphClass.map(f => f), outerPRgraphBullet.map(f => f), outerPRgraphBlitz.map(f => f)
+      innerPRgraph,
+      innerPRgraphClass,
+      innerPRgraphBullet,
+      innerPRgraphBlitz,
+      innerPRgraphRapid,
+
+      outerPRgraph,
+      outerPRgraphClass,
+      outerPRgraphBullet,
+      outerPRgraphBlitz,
+      outerPRgraphRapid
+
     )
 
 
@@ -149,7 +165,7 @@ object PlayersRanking {
 
   def mergeRows: ((VertexId, (Row, Double))) => (VertexId, Row) = f => (f._1, Row.merge(f._2._1, Row(f._2._2)))
 
-  def joinRankingRDDs(games: TupleRDDsFormat, prItr: Int = 5): RDD[Row] = {
+  def joinRankingRDDs(games: TupleRDDsFormat, prItr: Int): RDD[Row] = {
     val rankingData = tupleRDDtoPlayersRankingRdd3(games, prItr)
     rankingData._1.map(f => (f._1, Row(f._2)))
       .join(rankingData._2).map(mergeRows)
@@ -160,6 +176,8 @@ object PlayersRanking {
       .join(rankingData._7).map(mergeRows)
       .join(rankingData._8).map(mergeRows)
       .join(rankingData._9).map(mergeRows)
+      .join(rankingData._10).map(mergeRows)
+      .join(rankingData._11).map(mergeRows)
       .map(f => f._2)
 
 
@@ -176,7 +194,7 @@ object PlayersRanking {
 
     val sparkSession = new SparkSession.Builder().master("local[9]").appName("lichess").getOrCreate()
     sparkSession.sparkContext.setLogLevel("ERROR")
-    val games = pgnETtoTupleRDDs(sparkSession.sparkContext, Property.PGN_FILE2)
+    val games = pgnETtoTupleRDDs(sparkSession.sparkContext, Property.PGN_FILE, PGNExtractTransform.rankingUnUsedDataFilter) //todo add filter mothode
     val df = joinedRankingRDDsToDF(sparkSession, games)
 
 
@@ -184,6 +202,7 @@ object PlayersRanking {
 
 
   }
+
 
   //test
   def main(args: Array[String]): Unit = {
