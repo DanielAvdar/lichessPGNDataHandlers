@@ -16,6 +16,8 @@ object Property {
   val BLITZ = "Blitz"
   val RAPID = "Rapid"
 
+  val ALL_GAMES="ALL_GAMES"
+
   def filterValidator(event: String): Boolean = {
     event == CLASSIC || event == BULLET || event == BLITZ || event == RAPID
   }
@@ -91,8 +93,8 @@ object Property {
 
 
   type GraphFormat = Graph[String, (Long, String, String, String, String)]
-  type TupleRDDsFormat = (RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String],
-    RDD[String], RDD[String], RDD[String], RDD[String], RDD[String])
+  type TupleRDDsFormat = (RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String],
+    RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String])
 
 
 }

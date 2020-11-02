@@ -5,6 +5,7 @@ import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.storage.StorageLevel.MEMORY_AND_DISK_SER
 
 
 object PlayersRanking {
@@ -83,8 +84,9 @@ object PlayersRanking {
     fGraph
   }
 
-  def tupleRDDtoPlayersRankingRdd3(games: TupleRDDsFormat, prItr: Int): rankingTupleFormat = {
+  def tupleRDDtoPlayersRankingRdd3(games: TupleRDDsFormat, prItr: Int,onEvent:String=ALL_GAMES): rankingTupleFormat = {
     val (
+      pgnFile,
       eventsRDD,
       wPlayersRDD,
       bPlayersRDD,
@@ -100,51 +102,57 @@ object PlayersRanking {
       result
       ) = (
       eventsRDD.zipWithIndex().map(swapValKey).filter(f => Property.filterValidator(f._2)),
-      wPlayersRDD.zipWithIndex().map(swapValKey).cache(),
-      bPlayersRDD.zipWithIndex().map(swapValKey).cache(),
+      wPlayersRDD.zipWithIndex().map(swapValKey).persist(MEMORY_AND_DISK_SER),
+      bPlayersRDD.zipWithIndex().map(swapValKey).persist(MEMORY_AND_DISK_SER),
       resultRDD.zipWithIndex().map(swapValKey).filter(f => f._2 != DRAW)
     )
+    pgnFile.unpersist()
 
     println("tupleRDDtoPlayersRankingRdd")
     val edgesProperty = getEdgesProperty(events, result, wPlayers, bPlayers)
-    val vertexes = getVertexes3(wPlayers, bPlayers).cache
-    wPlayers.unpersist()
-    bPlayers.unpersist()
-    val edges = edgesProperty.map(mapToEdge3)
+    val vertexes = getVertexes3(wPlayers, bPlayers).persist(MEMORY_AND_DISK_SER)
 
-    val graph = Graph(vertexes, edges).cache
-    val graphClass = filterGraphByEvent(graph, CLASSIC).cache
-    val graphBullet = filterGraphByEvent(graph, BULLET).cache
-    val graphBlitz = filterGraphByEvent(graph, BLITZ).cache
-    val graphRapid = filterGraphByEvent(graph, RAPID).cache
+    val edges = edgesProperty.map(mapToEdge3).repartition(150).persist(MEMORY_AND_DISK_SER)
 
-    println("Graphs ready")
-
-    println("Start ranking")
-
+    val graph = Graph(vertexes, edges).cache()
     val innerPRgraph = getPageRang(graph, prItr)
+    wPlayersRDD.unpersist()
+    bPlayersRDD.unpersist()
     val outerPRgraph = getPageRang(graph.reverse, prItr)
 
+    val graphClass = filterGraphByEvent(graph, CLASSIC)
     val innerPRgraphClass = getPageRang(graphClass, prItr)
     val outerPRgraphClass = getPageRang(graphClass.reverse, prItr)
 
+    val graphBullet = filterGraphByEvent(graph, BULLET)
     val innerPRgraphBullet = getPageRang(graphBullet, prItr)
     val outerPRgraphBullet = getPageRang(graphBullet.reverse, prItr)
 
+    val graphBlitz = filterGraphByEvent(graph, BLITZ)
     val innerPRgraphBlitz = getPageRang(graphBlitz, prItr)
     val outerPRgraphBlitz = getPageRang(graphBlitz.reverse, prItr)
 
+    val graphRapid = filterGraphByEvent(graph, RAPID)
     val innerPRgraphRapid = getPageRang(graphRapid, prItr)
     val outerPRgraphRapid = getPageRang(graphRapid.reverse, prItr)
 
-    println("Ranked")
-    graphClass.unpersist()
-    graphBullet.unpersist()
-    graphBlitz.unpersist()
-    graph.unpersist()
-    println("Unpersist")
 
-    (
+
+
+
+
+
+
+
+
+
+
+
+    println("Ranked")
+    edges.unpersist()
+    println("Unpersist edges")
+
+    val res = (
       vertexes,
       innerPRgraph,
       innerPRgraphClass,
@@ -159,6 +167,7 @@ object PlayersRanking {
       outerPRgraphRapid
 
     )
+    res
 
 
   }
@@ -167,7 +176,7 @@ object PlayersRanking {
 
   def joinRankingRDDs(games: TupleRDDsFormat, prItr: Int): RDD[Row] = {
     val rankingData = tupleRDDtoPlayersRankingRdd3(games, prItr)
-    rankingData._1.map(f => (f._1, Row(f._2)))
+    val res = rankingData._1.map(f => (f._1, Row(f._2)))
       .join(rankingData._2).map(mergeRows)
       .join(rankingData._3).map(mergeRows)
       .join(rankingData._4).map(mergeRows)
@@ -179,6 +188,11 @@ object PlayersRanking {
       .join(rankingData._10).map(mergeRows)
       .join(rankingData._11).map(mergeRows)
       .map(f => f._2)
+//    rankingData._1.unpersist()
+//    println("Unpersist vertexes")
+
+    res
+
 
 
   }
@@ -190,11 +204,11 @@ object PlayersRanking {
   }
 
 
-  def playersRanRowRDDtoCSV(): Unit = {
+  def playersRanRowRDDtoCSVTest(): Unit = {
 
     val sparkSession = new SparkSession.Builder().master("local[9]").appName("lichess").getOrCreate()
     sparkSession.sparkContext.setLogLevel("ERROR")
-    val games = pgnETtoTupleRDDs(sparkSession.sparkContext, Property.PGN_FILE, PGNExtractTransform.rankingUnUsedDataFilter) //todo add filter mothode
+    val games = pgnETtoTupleRDDs(sparkSession.sparkContext, Property.PGN_FILE, PGNExtractTransform.rankingUnUsedDataFilter)
     val df = joinedRankingRDDsToDF(sparkSession, games)
 
 
@@ -206,7 +220,7 @@ object PlayersRanking {
 
   //test
   def main(args: Array[String]): Unit = {
-    playersRanRowRDDtoCSV()
+    playersRanRowRDDtoCSVTest()
 
   }
 
