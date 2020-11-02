@@ -4,7 +4,7 @@ import org.apache.spark.sql.SparkSession
 
 object RankingBigQueryLoader {
 
-  def rowRDDtoBigQuery(sparkSession: SparkSession, pgnPath: String, prItr: Int): Unit = {
+  def rowRDDtoBigQuery(sparkSession: SparkSession, pgnPath: String, prItr: Int, onEvent: String): Unit = {
 
 
     val bucket = BUCKET
@@ -17,13 +17,13 @@ object RankingBigQueryLoader {
       PGNExtractTransform.rankingUnUsedDataFilter)
 
 
-    val rankingDF = joinedRankingRDDsToDF(sparkSession, gamesRDD, prItr)
+    val rankingDF = joinedRankingRDDsToDF(sparkSession, gamesRDD, prItr, onEvent)
 
 
     rankingDF
       .write
       .format("bigquery")
-      .option("table", DATASET + ".ranking" + prItr.toString)
+      .option("table", DATASET + ".ranking" + prItr.toString + onEvent)
       .mode("overwrite").save()
 
 
@@ -31,7 +31,7 @@ object RankingBigQueryLoader {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length < 2) {
+    if (args.length < 3) {
       println("parameters missing")
       return
     }
@@ -39,11 +39,13 @@ object RankingBigQueryLoader {
 
     val pgnPath = args(0)
     val prItr = args(1).toInt
+    val onEvent = args(1)
+
     val sparkSession = SparkSession
       .builder()
       .appName("lichess")
       .getOrCreate()
-    rowRDDtoBigQuery(sparkSession, pgnPath, prItr)
+    rowRDDtoBigQuery(sparkSession, pgnPath, prItr, onEvent)
 
 
   }

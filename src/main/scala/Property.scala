@@ -41,16 +41,16 @@ object Property {
     "name",
 
     "innerPRgraph",
-    "innerPRgraphClass",
-    "innerPRgraphBullet",
-    "innerPRgraphBlitz",
-    "innerPRgraphRapid",
+//    "innerPRgraphClass",
+//    "innerPRgraphBullet",
+//    "innerPRgraphBlitz",
+//    "innerPRgraphRapid",
 
     "outerPRgraph",
-    "outerPRgraphClass",
-    "outerPRgraphBullet",
-    "outerPRgraphBlitz",
-    "outerPRgraphRapid",
+//    "outerPRgraphClass",
+//    "outerPRgraphBullet",
+//    "outerPRgraphBlitz",
+//    "outerPRgraphRapid",
 
 
   ).map(field => StructField(field, mapper(field), nullable = field != "name"))
@@ -81,12 +81,7 @@ object Property {
     String), String), String), String),
     String), String), String))
   type rankingTupleFormat = (RDD[(VertexId, String)],
-    RDD[(VertexId, Double)],  RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)], RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)],RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)], RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)])
+    RDD[(VertexId, Double)],  RDD[(VertexId, Double)])
 
 
   type EdgeFormat = Edge[(Long, String, String, String, String)]
