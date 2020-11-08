@@ -128,22 +128,6 @@ object PlayersRanking {
     edges.unpersist()
     graph.unpersist()
 
-    //    val graphClass = filterGraphByEvent(graph, CLASSIC)
-    //    val innerPRgraphClass = getPageRang(graphClass, prItr)
-    //    val outerPRgraphClass = getPageRang(graphClass.reverse, prItr)
-    //
-    //    val graphBullet = filterGraphByEvent(graph, BULLET)
-    //    val innerPRgraphBullet = getPageRang(graphBullet, prItr)
-    //    val outerPRgraphBullet = getPageRang(graphBullet.reverse, prItr)
-    //
-    //    val graphBlitz = filterGraphByEvent(graph, BLITZ)
-    //    val innerPRgraphBlitz = getPageRang(graphBlitz, prItr)
-    //    val outerPRgraphBlitz = getPageRang(graphBlitz.reverse, prItr)
-    //
-    //    val graphRapid = filterGraphByEvent(graph, RAPID)
-    //    val innerPRgraphRapid = getPageRang(graphRapid, prItr)
-    //    val outerPRgraphRapid = getPageRang(graphRapid.reverse, prItr)
-
 
     println("Ranked")
 
@@ -151,16 +135,10 @@ object PlayersRanking {
     val res = (
       vertexes,
       innerPRgraph,
-      //      innerPRgraphClass,
-      //      innerPRgraphBullet,
-      //      innerPRgraphBlitz,
-      //      innerPRgraphRapid,
+
 
       outerPRgraph,
-      //      outerPRgraphClass,
-      //      outerPRgraphBullet,
-      //      outerPRgraphBlitz,
-      //      outerPRgraphRapid
+
 
     )
     res
@@ -175,17 +153,9 @@ object PlayersRanking {
     val res = rankingData._1.map(f => (f._1, Row(f._2)))
       .join(rankingData._2).map(mergeRows)
       .join(rankingData._3).map(mergeRows)
-      //      .join(rankingData._4).map(mergeRows)
-      //      .join(rankingData._5).map(mergeRows)
-      //      .join(rankingData._6).map(mergeRows)
-      //      .join(rankingData._7).map(mergeRows)
-      //      .join(rankingData._8).map(mergeRows)
-      //      .join(rankingData._9).map(mergeRows)
-      //      .join(rankingData._10).map(mergeRows)
-      //      .join(rankingData._11).map(mergeRows)
+
       .map(f => f._2)
-    //    rankingData._1.unpersist()
-    //    println("Unpersist vertexes")
+
 
     res
 
