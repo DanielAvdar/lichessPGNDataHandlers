@@ -16,7 +16,7 @@ object Property {
   val BLITZ = "Blitz"
   val RAPID = "Rapid"
 
-  val ALL_GAMES="ALL_GAMES"
+  val ALL_GAMES = "ALL_GAMES"
 
   def filterValidator(event: String): Boolean = {
     event == CLASSIC || event == BULLET || event == BLITZ || event == RAPID
@@ -41,16 +41,9 @@ object Property {
     "name",
 
     "innerPRgraph",
-//    "innerPRgraphClass",
-//    "innerPRgraphBullet",
-//    "innerPRgraphBlitz",
-//    "innerPRgraphRapid",
+
 
     "outerPRgraph",
-//    "outerPRgraphClass",
-//    "outerPRgraphBullet",
-//    "outerPRgraphBlitz",
-//    "outerPRgraphRapid",
 
 
   ).map(field => StructField(field, mapper(field), nullable = field != "name"))
@@ -81,7 +74,7 @@ object Property {
     String), String), String), String),
     String), String), String))
   type rankingTupleFormat = (RDD[(VertexId, String)],
-    RDD[(VertexId, Double)],  RDD[(VertexId, Double)])
+    RDD[(VertexId, Double)], RDD[(VertexId, Double)])
 
 
   type EdgeFormat = Edge[(Long, String, String, String, String)]
@@ -90,6 +83,9 @@ object Property {
   type GraphFormat = Graph[String, (Long, String, String, String, String)]
   type TupleRDDsFormat = (RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String],
     RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String])
+  type TupleRDDsWithIndexFormat = (RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)])
 
 
 }

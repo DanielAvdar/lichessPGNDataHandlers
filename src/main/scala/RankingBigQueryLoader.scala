@@ -39,7 +39,7 @@ object RankingBigQueryLoader {
 
     val pgnPath = args(0)
     val prItr = args(1).toInt
-    val onEvent = args(1)
+    val onEvent = args(2)
 
     val sparkSession = SparkSession
       .builder()
