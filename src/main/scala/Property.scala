@@ -10,9 +10,18 @@ object Property {
   val BLACK = "B"
   val WHITE = "W"
   val DRAW = "D"
+
   val CLASSIC = "Classical"
   val BULLET = "Bullet"
   val BLITZ = "Blitz"
+  val RAPID = "Rapid"
+
+  val ALL_GAMES = "ALL_GAMES"
+
+  def filterValidator(event: String): Boolean = {
+    event == CLASSIC || event == BULLET || event == BLITZ || event == RAPID
+  }
+
   val BUCKET = "pgn_contaner"
   val DATASET = "lichessDS"
 
@@ -29,17 +38,12 @@ object Property {
     .withDefault((_: String) => DoubleType)
 
   val rankinSchema2: Seq[StructField] = Seq(
-    "name", //0
+    "name",
 
-    "innerPRgraph", //4
-    "innerPRgraphClass", //2
-    "innerPRgraphBullet", //3
-    "innerPRgraphBlitz", //7
+    "innerPRgraph",
 
-    "outerPRgraph", //5
-    "outerPRgraphClass", //6
-    "outerPRgraphBullet", //10
-    "outerPRgraphBlitz", //8
+
+    "outerPRgraph",
 
 
   ).map(field => StructField(field, mapper(field), nullable = field != "name"))
@@ -69,15 +73,19 @@ object Property {
   type GameJoinFormat = (Long, (((((((((((String, String), String), String), String),
     String), String), String), String),
     String), String), String))
-  type rankingTupleFormat = (RDD[(VertexId, String)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)],
-    RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)], RDD[(VertexId, Double)])
+  type rankingTupleFormat = (RDD[(VertexId, String)],
+    RDD[(VertexId, Double)], RDD[(VertexId, Double)])
 
 
   type EdgeFormat = Edge[(Long, String, String, String, String)]
 
 
   type GraphFormat = Graph[String, (Long, String, String, String, String)]
-  type TupleRDDsFormat = (RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String])
+  type TupleRDDsFormat = (RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String],
+    RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String], RDD[String])
+  type TupleRDDsWithIndexFormat = (RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)],
+    RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)], RDD[(Long, String)])
 
 
 }

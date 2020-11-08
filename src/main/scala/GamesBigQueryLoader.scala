@@ -18,7 +18,7 @@ object GamesBigQueryLoader {
 
     val bucket = BUCKET
     sparkSession.conf.set("temporaryGcsBucket", bucket)
-    df.write.format("bigquery").option("table", DATASET + ".games").mode("overwrite").save()
+    df.write.format("bigquery").option("table", DATASET + ".gamesTable").mode("overwrite").save()
 
 
   }
